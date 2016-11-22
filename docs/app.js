@@ -1,8 +1,8 @@
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
-  typeof define === 'function' && define.amd ? define(['exports'], factory) :
-  (factory((global.app = global.app || {})));
-}(this, (function (exports) { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory() :
+  typeof define === 'function' && define.amd ? define(factory) :
+  (factory());
+}(this, (function () { 'use strict';
 
 /* jshint esversion: 6, undef: true */
 /* globals document, Uint32Array, Int32Array */
@@ -84,6 +84,79 @@ let renderNormalizedChan = (imdata, chan, canvas) => {
     done();
   });
 };
+
+/* jshint esversion: 6, undef: true */
+/* globals console, Int32Array */
+
+let convolveOneWay = (kernel, imageData, step) => {
+  let {width: cols, height: rows, data: idata} = imageData;
+  let output = new Int32Array(cols*rows*NRGBA);
+
+  const shift = kernel.length >>> 1;
+  const add = kernel.length % 2;
+
+  let kap = (i) => {
+    let r = 0, g = 0, b = 0, a = 0;
+    for (let k = -shift; k < shift + add; k++) {
+      let kval = kernel[k+shift];
+      r += idata[i+(step*NRGBA*k)+0] * kval;
+      g += idata[i+(step*NRGBA*k)+1] * kval;
+      b += idata[i+(step*NRGBA*k)+2] * kval;
+      a += idata[i+(step*NRGBA*k)+3] * kval;
+    }
+    return [r,g,b,a];
+  };
+
+  for (let col = 0; col < cols; col++) {
+    for (let row = shift; row < rows - shift; row++) {
+      let i = NRGBA * (row * cols + col);
+      let [r,g,b,a] = kap(i);
+      output[i+0] = r;
+      output[i+1] = g;
+      output[i+2] = b;
+      output[i+3] = a;
+    }
+  }
+
+  return {
+    data: output,
+    width: cols,
+    height: rows
+  };
+};
+
+let horizontal = (kernel, imageData) => {
+  return convolveOneWay(kernel, imageData, 1);
+};
+
+let vertical = (kernel, imageData) => {
+  let {width: cols} = imageData;
+  // when convolving vertically, make `cols'-sized steps
+  // when looking for neighbors as `imageData' is row-major
+  return convolveOneWay(kernel, imageData, cols);
+};
+
+/* jshint esversion: 6, undef: true */
+
+let sub = (x, y) => x.map((x, i) => x - y[i]);
+
+let sum$1 = (x, y) => x.map((x, i) => x + y[i]);
+
+let dot = (x, y) => x.map((x, i) => x * y[i]).reduce((a, x) => a + x);
+
+let norm = x => Math.sqrt(dot(x, x));
+
+/* jshint esversion: 6, undef: true */
+
+
+
+function mapnorm({width, height, data: a}, {data: b}) {
+  return {
+    width: width,
+    height: height,
+    data: a.map((x, i) => norm([x, b[i]]))
+  };
+}
 
 /* jshint esversion: 6 */
 /* based on https://github.com/brunch/auto-reload-brunch */
@@ -174,91 +247,18 @@ console.log("hello?");
 
 
 
-// let halfGaussian = [0.25, 0.5, 0.25];
-let halfGaussian = [0.1, 0.2, 0.4, 0.2, 0.1];
-
-let convolveHorizontal = (kernel8, imageData) => {
-  let {width: cols, height: rows, data: idata} = imageData;
-  let output = new Int32Array(cols*rows*NRGBA);
-
-  const shift = kernel8.length >>> 1;
-  const add = kernel8.length % 2;
-
-  let kap = (i) => {
-    let r = 0, g = 0, b = 0, a = 0;
-    for (let k = -shift; k < shift + add; k++) {
-      r += idata[i+(NRGBA*k)+0] * kernel8[k+shift];
-      g += idata[i+(NRGBA*k)+1] * kernel8[k+shift];
-      b += idata[i+(NRGBA*k)+2] * kernel8[k+shift];
-      a += idata[i+(NRGBA*k)+3] * kernel8[k+shift];
-    }
-    return [r,g,b,a];
-  };
-
-  for (let row = 0; row < rows; row++) {
-    for (let col = shift; col < cols - shift; col++) {
-      let i = NRGBA * (row * cols + col);
-      let [r,g,b,a] = kap(i);
-      output[i+0] = r;
-      output[i+1] = g;
-      output[i+2] = b;
-      output[i+3] = a;
-    }
-  }
-
-  return {
-    data: output,
-    width: cols,
-    height: rows
-  };
-};
-
-let convolveVertical = (kernel8, imageData) => {
-  let {width: cols, height: rows, data: idata} = imageData;
-  let output = new Int32Array(cols*rows*NRGBA);
-
-  const shift = kernel8.length >>> 1;
-  const add = kernel8.length % 2;
-
-  let kap = (i) => {
-    let r = 0, g = 0, b = 0, a = 0;
-    for (let k = -shift; k < shift + add; k++) {
-      let kval = kernel8[k+shift];
-      r += idata[i+(cols*NRGBA*k)+0] * kval;
-      g += idata[i+(cols*NRGBA*k)+1] * kval;
-      b += idata[i+(cols*NRGBA*k)+2] * kval;
-      a += idata[i+(cols*NRGBA*k)+3] * kval;
-    }
-    return [r,g,b,a];
-  };
-
-  for (let col = 0; col < cols; col++) {
-    for (let row = shift; row < rows - shift; row++) {
-      let i = NRGBA * (row * cols + col);
-      let [r,g,b,a] = kap(i);
-      output[i+0] = r;
-      output[i+1] = g;
-      output[i+2] = b;
-      output[i+3] = a;
-    }
-  }
-
-  return {
-    data: output,
-    width: cols,
-    height: rows
-  };
-};
+let sobel1 = [1, 2, 1];
+let sobel2 = [-1, 0, 1];
 
 let id = fromImg(testImage);
-let outp = convolveVertical(halfGaussian, convolveHorizontal(halfGaussian, id));
+//let outp = convolveVertical(gaussian, convolveHorizontal(halfGaussian, id));
+//canvas.renderNormalizedChan(outp, 0, defcanvas);
 
-renderNormalizedChan(outp, 0, defcanvas);
+let outpX = vertical(sobel1, horizontal(sobel2, id));
+let outpY = vertical(sobel2, horizontal(sobel1, id));
+
+renderNormalizedChan(mapnorm(outpX, outpY), 2, defcanvas);
 
 autoReload();
-
-exports.convolveVertical = convolveVertical;
-
-Object.defineProperty(exports, '__esModule', { value: true });
 
 })));
