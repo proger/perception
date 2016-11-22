@@ -49,6 +49,9 @@ export default function autoReload() {
   if (typeof window._ar_connection !== 'undefined') {
     return;
   }
+  if (window.location.protocol === "https:") {
+    return;
+  }
   var connection = new WebSocket('ws://' + host + ':' + port);
   console.log(`created connection: ${connection}`);
 
