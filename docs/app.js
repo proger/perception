@@ -7,15 +7,15 @@
 /* jshint esversion: 6, undef: true */
 /* globals document, Uint32Array, Int32Array */
 
-const NRGBA = 4;
+const NRGBA = 4|0;
 
 
 
-let chanBounds = (u32) => {
+let chanBounds = (i32) => {
   let vals = Array(NRGBA).fill(null).map((_) => ({max: 0, min: 0}));
-  for (let i = 0; i < u32.length / NRGBA; i++) {
+  for (let i = 0; i < i32.length / NRGBA; i++) {
     for (let chan = 0; chan < NRGBA; chan++) {
-      let x = u32[i*NRGBA + chan];
+      let x = i32[i*NRGBA + chan];
       vals[chan].min = Math.min(x, vals[chan].min);
       vals[chan].max = Math.max(x, vals[chan].max);
     }
@@ -86,77 +86,110 @@ let renderNormalizedChan = (imdata, chan, canvas) => {
 };
 
 /* jshint esversion: 6, undef: true */
-/* globals console, Int32Array */
-
-let convolveOneWay = (kernel, imageData, step) => {
-  let {width: cols, height: rows, data: idata} = imageData;
-  let output = new Int32Array(cols*rows*NRGBA);
-
-  const shift = kernel.length >>> 1;
-  const add = kernel.length % 2;
-
-  let kap = (i) => {
-    let r = 0, g = 0, b = 0, a = 0;
-    for (let k = -shift; k < shift + add; k++) {
-      let kval = kernel[k+shift];
-      r += idata[i+(step*NRGBA*k)+0] * kval;
-      g += idata[i+(step*NRGBA*k)+1] * kval;
-      b += idata[i+(step*NRGBA*k)+2] * kval;
-      a += idata[i+(step*NRGBA*k)+3] * kval;
-    }
-    return [r,g,b,a];
-  };
-
-  for (let col = 0; col < cols; col++) {
-    for (let row = shift; row < rows - shift; row++) {
-      let i = NRGBA * (row * cols + col);
-      let [r,g,b,a] = kap(i);
-      output[i+0] = r;
-      output[i+1] = g;
-      output[i+2] = b;
-      output[i+3] = a;
-    }
-  }
-
-  return {
-    data: output,
-    width: cols,
-    height: rows
-  };
-};
-
-let horizontal = (kernel, imageData) => {
-  return convolveOneWay(kernel, imageData, 1);
-};
-
-let vertical = (kernel, imageData) => {
-  let {width: cols} = imageData;
-  // when convolving vertically, make `cols'-sized steps
-  // when looking for neighbors as `imageData' is row-major
-  return convolveOneWay(kernel, imageData, cols);
-};
-
-/* jshint esversion: 6, undef: true */
 
 let sub = (x, y) => x.map((x, i) => x - y[i]);
 
-let sum$1 = (x, y) => x.map((x, i) => x + y[i]);
 
-let dot = (x, y) => x.map((x, i) => x * y[i]).reduce((a, x) => a + x);
+
+//export let dot = (x, y) => x.map((x, i) => x * y[i]).reduce((a, x) => a + x);
+
+//export let dot = (xs, ys) => xs.reduce(((a, x, i) => a + (x * ys[i])), 0);
+
+let dot = (xs, ys) => {
+  let acc = 0;
+  for (let i = 0; i < xs.length; i++) {
+    acc += xs[i] * ys[i];
+  }
+  return acc;
+};
 
 let norm = x => Math.sqrt(dot(x, x));
 
+// export let magnitude = (xs, ys) => xs.map((x, i) => vector.norm([x, ys[i]]));
+
+let magnitude = (xs, ys) => {
+  let magnitude = new Int32Array(xs);
+  for (let i = 0; i < magnitude.length; i++) {
+    magnitude[i] = Math.sqrt(xs[i] * xs[i] + ys[i] * ys[i]);
+  }
+  return magnitude;
+};
+
 /* jshint esversion: 6, undef: true */
+/* globals window, console, Int32Array */
 
+let imul = Math.imul;
 
+function convolve1d(kernel, i32data, step) {
+  const len = i32data.length;
+  let output = new Int32Array(len);
 
-function mapnorm({width, height, data: a}, {data: b}) {
-  return {
-    width: width,
-    height: height,
-    data: a.map((x, i) => norm([x, b[i]]))
-  };
+  const shift = kernel.length >>> 1;
+  const rem = kernel.length % 2;
+  const chanstep = imul(step, NRGBA);
+
+  const minbound = imul(shift, chanstep);
+  const maxbound = len - imul(shift + rem, chanstep);
+
+  for (let i = minbound; i < maxbound; i++) {
+    for (let k = -shift; k < shift + rem; k++) {
+      let i32 = i + imul(chanstep, k);
+      let val = i32data[i32];
+      output[i] += imul(val, kernel[k+shift]);
+    }
+  }
+
+  return output;
 }
+
+
+
+
+
+/* trick: convolve two inputs with two kernels at once */
+function convolve1dx2(kernel, i32data, kernel2, i32data2, step) {
+  const len = i32data.length;
+  let output = new Int32Array(len);
+  let output2 = new Int32Array(len);
+
+  const shift = kernel.length >>> 1;
+  const rem = kernel.length % 2;
+  const chanstep = imul(step, NRGBA);
+
+  const minbound = imul(shift, chanstep);
+  const maxbound = len - imul(shift + rem, chanstep);
+
+  for (let i = minbound; i < maxbound; i++) {
+    for (let k = -shift; k < shift + rem; k++) {
+      let i32 = i + imul(chanstep, k);
+      output[i] += imul(i32data[i32], kernel[k+shift]);
+      output2[i] += imul(i32data2[i32], kernel2[k+shift]);
+    }
+  }
+
+  return [output, output2];
+}
+
+let sobel = (imageData) => {
+  let sobel1 = new Int32Array([1, 2, 1]);
+  let sobel2 = new Int32Array([-1, 0, 1]);
+  let i32s = new Int32Array(imageData.data);
+
+  console.time("sobel-convolve");
+  let [x1, y1] = convolve1dx2(sobel2, i32s, sobel1, i32s, 1);
+  let [xs, ys] = convolve1dx2(sobel1, x1, sobel2, y1, imageData.width);
+  console.timeEnd("sobel-convolve");
+
+  console.time("sobel-magnitude");
+  let magnitude$$1 = magnitude(xs, ys);
+  console.timeEnd("sobel-magnitude");
+
+  return {
+    width: imageData.width,
+    height: imageData.height,
+    data: magnitude$$1
+  };
+};
 
 /* jshint esversion: 6 */
 /* based on https://github.com/brunch/auto-reload-brunch */
@@ -247,17 +280,14 @@ console.log("hello?");
 
 
 
-let sobel1 = [1, 2, 1];
-let sobel2 = [-1, 0, 1];
-
 let id = fromImg(testImage);
 //let outp = convolveVertical(gaussian, convolveHorizontal(halfGaussian, id));
 //canvas.renderNormalizedChan(outp, 0, defcanvas);
 
-let outpX = vertical(sobel1, horizontal(sobel2, id));
-let outpY = vertical(sobel2, horizontal(sobel1, id));
-
-renderNormalizedChan(mapnorm(outpX, outpY), 2, defcanvas);
+console.profile("sobel");
+let sob = sobel(id);
+console.profileEnd("sobel");
+renderNormalizedChan(sob, 2, defcanvas);
 
 autoReload();
 

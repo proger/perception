@@ -17,5 +17,8 @@
     "rollup": "^0.36.3",
     "static-server": "^2.0.3",
     "ws": "^1.1.1"
+  },
+  "devDependencies": {
+    "canvas": "^1.6.2"
   }
 }

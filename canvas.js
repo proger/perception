@@ -1,7 +1,7 @@
 /* jshint esversion: 6, undef: true */
 /* globals document, Uint32Array, Int32Array */
 
-export const NRGBA = 4;
+export const NRGBA = 4|0;
 
 export let u32ExtractChan = (u32, chan) => {
   let o = Int32Array(u32.length / NRGBA);
@@ -11,11 +11,11 @@ export let u32ExtractChan = (u32, chan) => {
   return o;
 };
 
-let chanBounds = (u32) => {
+let chanBounds = (i32) => {
   let vals = Array(NRGBA).fill(null).map((_) => ({max: 0, min: 0}));
-  for (let i = 0; i < u32.length / NRGBA; i++) {
+  for (let i = 0; i < i32.length / NRGBA; i++) {
     for (let chan = 0; chan < NRGBA; chan++) {
-      let x = u32[i*NRGBA + chan];
+      let x = i32[i*NRGBA + chan];
       vals[chan].min = Math.min(x, vals[chan].min);
       vals[chan].max = Math.max(x, vals[chan].max);
     }
