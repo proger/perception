@@ -1,8 +1,8 @@
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? factory() :
-  typeof define === 'function' && define.amd ? define(factory) :
-  (factory());
-}(this, (function () { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
+  typeof define === 'function' && define.amd ? define(['exports'], factory) :
+  (factory((global.app = global.app || {})));
+}(this, (function (exports) { 'use strict';
 
 /* jshint esversion: 6, undef: true */
 /* globals document, Uint32Array, Int32Array */
@@ -85,112 +85,6 @@ let renderNormalizedChan = (imdata, chan, canvas) => {
   });
 };
 
-/* jshint esversion: 6, undef: true */
-
-let sub = (x, y) => x.map((x, i) => x - y[i]);
-
-
-
-//export let dot = (x, y) => x.map((x, i) => x * y[i]).reduce((a, x) => a + x);
-
-//export let dot = (xs, ys) => xs.reduce(((a, x, i) => a + (x * ys[i])), 0);
-
-let dot = (xs, ys) => {
-  let acc = 0;
-  for (let i = 0; i < xs.length; i++) {
-    acc += xs[i] * ys[i];
-  }
-  return acc;
-};
-
-let norm = x => Math.sqrt(dot(x, x));
-
-// export let magnitude = (xs, ys) => xs.map((x, i) => vector.norm([x, ys[i]]));
-
-let magnitude = (xs, ys) => {
-  let magnitude = new Int32Array(xs);
-  for (let i = 0; i < magnitude.length; i++) {
-    magnitude[i] = Math.sqrt(xs[i] * xs[i] + ys[i] * ys[i]);
-  }
-  return magnitude;
-};
-
-/* jshint esversion: 6, undef: true */
-/* globals window, console, Int32Array */
-
-let imul = Math.imul;
-
-function convolve1d(kernel, i32data, step) {
-  const len = i32data.length;
-  let output = new Int32Array(len);
-
-  const shift = kernel.length >>> 1;
-  const rem = kernel.length % 2;
-  const chanstep = imul(step, NRGBA);
-
-  const minbound = imul(shift, chanstep);
-  const maxbound = len - imul(shift + rem, chanstep);
-
-  for (let i = minbound; i < maxbound; i++) {
-    for (let k = -shift; k < shift + rem; k++) {
-      let i32 = i + imul(chanstep, k);
-      let val = i32data[i32];
-      output[i] += imul(val, kernel[k+shift]);
-    }
-  }
-
-  return output;
-}
-
-
-
-
-
-/* trick: convolve two inputs with two kernels at once */
-function convolve1dx2(kernel, i32data, kernel2, i32data2, step) {
-  const len = i32data.length;
-  let output = new Int32Array(len);
-  let output2 = new Int32Array(len);
-
-  const shift = kernel.length >>> 1;
-  const rem = kernel.length % 2;
-  const chanstep = imul(step, NRGBA);
-
-  const minbound = imul(shift, chanstep);
-  const maxbound = len - imul(shift + rem, chanstep);
-
-  for (let i = minbound; i < maxbound; i++) {
-    for (let k = -shift; k < shift + rem; k++) {
-      let i32 = i + imul(chanstep, k);
-      output[i] += imul(i32data[i32], kernel[k+shift]);
-      output2[i] += imul(i32data2[i32], kernel2[k+shift]);
-    }
-  }
-
-  return [output, output2];
-}
-
-let sobel = (imageData) => {
-  let sobel1 = new Int32Array([1, 2, 1]);
-  let sobel2 = new Int32Array([-1, 0, 1]);
-  let i32s = new Int32Array(imageData.data);
-
-  console.time("sobel-convolve");
-  let [x1, y1] = convolve1dx2(sobel2, i32s, sobel1, i32s, 1);
-  let [xs, ys] = convolve1dx2(sobel1, x1, sobel2, y1, imageData.width);
-  console.timeEnd("sobel-convolve");
-
-  console.time("sobel-magnitude");
-  let magnitude$$1 = magnitude(xs, ys);
-  console.timeEnd("sobel-magnitude");
-
-  return {
-    width: imageData.width,
-    height: imageData.height,
-    data: magnitude$$1
-  };
-};
-
 /* jshint esversion: 6 */
 /* based on https://github.com/brunch/auto-reload-brunch */
 
@@ -263,32 +157,177 @@ function autoReload() {
 }
 
 /* jshint esversion: 6, undef: true */
-/* globals document, console, Int32Array */
 
-let defcanvas = document.getElementById('defcanvas') || document.createElement('canvas');
-defcanvas.id = 'defcanvas';
-attachPicker(defcanvas, document.getElementById('color'));
-let ctx = defcanvas.getContext('2d');
+let sub = (x, y) => x.map((x, i) => x - y[i]);
+
+
+
+//export let dot = (x, y) => x.map((x, i) => x * y[i]).reduce((a, x) => a + x);
+
+//export let dot = (xs, ys) => xs.reduce(((a, x, i) => a + (x * ys[i])), 0);
+
+let dot = (xs, ys) => {
+  let acc = 0;
+  for (let i = 0; i < xs.length; i++) {
+    acc += xs[i] * ys[i];
+  }
+  return acc;
+};
+
+let norm = x => Math.sqrt(dot(x, x));
+
+// export let magnitude = (xs, ys) => xs.map((x, i) => vector.norm([x, ys[i]]));
+
+let magnitude = (xs, ys) => {
+  let magnitude = new Int32Array(xs);
+  for (let i = 0; i < magnitude.length; i++) {
+    magnitude[i] = Math.sqrt(xs[i] * xs[i] + ys[i] * ys[i]);
+  }
+  return magnitude;
+};
+
+/* jshint esversion: 6, undef: true */
+/* globals window, console, Int32Array */
+
+let imul = Math.imul;
+
+function convolve1d(kernel, i32data, step) {
+  const len = i32data.length;
+  let output = new Int32Array(len);
+
+  const shift = kernel.length >>> 1;
+  const rem = kernel.length % 2;
+
+  const minbound = imul(shift, step);
+  const maxbound = len - imul(shift + rem, step);
+
+  for (let i = minbound; i < maxbound; i++) {
+    for (let k = -shift; k < shift + rem; k++) {
+      let i32 = i + imul(step, k);
+      let val = i32data[i32];
+      output[i] += imul(val, kernel[k+shift]);
+    }
+  }
+
+  return output;
+}
+
+
+
+
+
+/* trick: convolve two inputs with two kernels at once */
+function convolve1dx2(kernel, i32data, kernel2, i32data2, step) {
+  const len = i32data.length;
+  let output = new Int32Array(len);
+  let output2 = new Int32Array(len);
+
+  const shift = kernel.length >>> 1;
+  const rem = kernel.length % 2;
+
+  const minbound = imul(shift, step);
+  const maxbound = len - imul(shift + rem, step);
+
+  for (let i = minbound; i < maxbound; i++) {
+    for (let k = -shift; k < shift + rem; k++) {
+      let i32 = i + imul(step, k);
+      output[i] += imul(i32data[i32], kernel[k+shift]);
+      output2[i] += imul(i32data2[i32], kernel2[k+shift]);
+    }
+  }
+
+  return [output, output2];
+}
+
+let sobel = (imageData) => {
+  let sobel1 = new Int32Array([1, 2, 1]);
+  let sobel2 = new Int32Array([-1, 0, 1]);
+  let i32s = new Int32Array(imageData.data);
+
+  console.time("sobel-convolve");
+  let [x1, y1] = convolve1dx2(sobel2, i32s, sobel1, i32s, NRGBA);
+  let [xs, ys] = convolve1dx2(sobel1, x1, sobel2, y1, NRGBA * imageData.width);
+  console.timeEnd("sobel-convolve");
+
+  console.time("sobel-magnitude");
+  let magnitude$$1 = magnitude(xs, ys);
+  console.timeEnd("sobel-magnitude");
+
+  return {
+    width: imageData.width,
+    height: imageData.height,
+    data: magnitude$$1
+  };
+};
+
+
+let gradient = (imageData) => {
+  let k = new Int32Array([-1, 1]);
+  let i32s = new Int32Array(imageData.data);
+
+  console.time("gradient-convolve");
+  let xs = convolve1d(k, i32s, NRGBA);
+  let ys = convolve1d(k, i32s, NRGBA * imageData.width);
+  console.timeEnd("gradient-convolve");
+
+  console.time("gradient-magnitude");
+  let magnitude$$1 = magnitude(xs, ys);
+  console.timeEnd("gradient-magnitude");
+
+  return {
+    width: imageData.width,
+    height: imageData.height,
+    data: magnitude$$1
+  };
+};
+
+/* jshint esversion: 6, undef: true */
+/* globals document, console */
+
+autoReload();
+
+let gencanvas = (name = 'defcanvas', theCanvas = null) => {
+  let blockName = `${name}-block`;
+  let block = document.getElementById(blockName);
+  let existing = block !== null;
+  if (!existing) {
+    block = document.createElement('div');
+  }
+
+  let canv = theCanvas || document.getElementById(name) || document.createElement('canvas');
+  canv.id = name;
+  let pickerName = `${name}-color`;
+  let picker = document.getElementById(pickerName) || document.createElement('div');
+
+  if (!existing) {
+    attachPicker(canv, picker);
+    canv.width = 640;
+    canv.height = 360;
+
+    document.body.appendChild(block);
+    block.appendChild(picker);
+    block.appendChild(canv);
+  }
+
+  return canv;
+};
+
 let testImage = document.getElementById('testImage');
-
-defcanvas.width = testImage.width;
-defcanvas.height = testImage.height;
-
-document.body.appendChild(defcanvas);
-
-console.log("hello?");
-
-
 
 let id = fromImg(testImage);
 //let outp = convolveVertical(gaussian, convolveHorizontal(halfGaussian, id));
 //canvas.renderNormalizedChan(outp, 0, defcanvas);
 
-console.profile("sobel");
+//console.profile("sobel");
 let sob = sobel(id);
-console.profileEnd("sobel");
-renderNormalizedChan(sob, 2, defcanvas);
+//console.profileEnd("sobel");
+renderNormalizedChan(sob, 2, gencanvas('defcanvas'));
 
-autoReload();
+let grad = gradient(id);
+renderNormalizedChan(grad, 2, gencanvas('gradcanvas'));
+
+exports.gencanvas = gencanvas;
+
+Object.defineProperty(exports, '__esModule', { value: true });
 
 })));

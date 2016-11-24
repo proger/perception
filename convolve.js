@@ -12,14 +12,13 @@ function convolve1d(kernel, i32data, step) {
 
   const shift = kernel.length >>> 1;
   const rem = kernel.length % 2;
-  const chanstep = imul(step, NRGBA);
 
-  const minbound = imul(shift, chanstep);
-  const maxbound = len - imul(shift + rem, chanstep);
+  const minbound = imul(shift, step);
+  const maxbound = len - imul(shift + rem, step);
 
   for (let i = minbound; i < maxbound; i++) {
     for (let k = -shift; k < shift + rem; k++) {
-      let i32 = i + imul(chanstep, k);
+      let i32 = i + imul(step, k);
       let val = i32data[i32];
       output[i] += imul(val, kernel[k+shift]);
     }
@@ -58,14 +57,13 @@ function convolve1dx2(kernel, i32data, kernel2, i32data2, step) {
 
   const shift = kernel.length >>> 1;
   const rem = kernel.length % 2;
-  const chanstep = imul(step, NRGBA);
 
-  const minbound = imul(shift, chanstep);
-  const maxbound = len - imul(shift + rem, chanstep);
+  const minbound = imul(shift, step);
+  const maxbound = len - imul(shift + rem, step);
 
   for (let i = minbound; i < maxbound; i++) {
     for (let k = -shift; k < shift + rem; k++) {
-      let i32 = i + imul(chanstep, k);
+      let i32 = i + imul(step, k);
       output[i] += imul(i32data[i32], kernel[k+shift]);
       output2[i] += imul(i32data2[i32], kernel2[k+shift]);
     }
@@ -80,13 +78,34 @@ export let sobel = (imageData) => {
   let i32s = new Int32Array(imageData.data);
 
   console.time("sobel-convolve");
-  let [x1, y1] = convolve1dx2(sobel2, i32s, sobel1, i32s, 1);
-  let [xs, ys] = convolve1dx2(sobel1, x1, sobel2, y1, imageData.width);
+  let [x1, y1] = convolve1dx2(sobel2, i32s, sobel1, i32s, NRGBA);
+  let [xs, ys] = convolve1dx2(sobel1, x1, sobel2, y1, NRGBA * imageData.width);
   console.timeEnd("sobel-convolve");
 
   console.time("sobel-magnitude");
   let magnitude = vector.magnitude(xs, ys);
   console.timeEnd("sobel-magnitude");
+
+  return {
+    width: imageData.width,
+    height: imageData.height,
+    data: magnitude
+  };
+};
+
+
+export let gradient = (imageData) => {
+  let k = new Int32Array([-1, 1]);
+  let i32s = new Int32Array(imageData.data);
+
+  console.time("gradient-convolve");
+  let xs = convolve1d(k, i32s, NRGBA);
+  let ys = convolve1d(k, i32s, NRGBA * imageData.width);
+  console.timeEnd("gradient-convolve");
+
+  console.time("gradient-magnitude");
+  let magnitude = vector.magnitude(xs, ys);
+  console.timeEnd("gradient-magnitude");
 
   return {
     width: imageData.width,

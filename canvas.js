@@ -59,23 +59,9 @@ let abgr32 = (a, b, g, r) => (
 export let render = (imageData, canvas) => {
   let {width: cols, height: rows, data: idata} = imageData;
 
-  withCanvasImageData(canvas, (imageData, cb) => {
-    let data_u32 = new Uint32Array(imageData.data.buffer);
-
-    // ABGR
-    data_u32.fill(0xff00ff00);
-
-    for (let col = 0; col < cols; col++) {
-      for (let row = 0; row < rows; row++) {
-        let i32 = (row * cols + col);
-        let i8 = 4 * i32;
-        // RGBA
-        let r = idata[i8 + 0];
-        let g = idata[i8 + 1];
-        let b = idata[i8 + 2];
-
-        data_u32[i32] = abgr32(0xff, b, g, r);
-      }
+  withCanvasImageData(canvas, ({ data }, cb) => {
+    for (let i = 0; i < data.length; i++) {
+      data[i] = idata[i];
     }
 
     cb();
